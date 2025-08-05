@@ -78,7 +78,7 @@
         return;
       }
 
-      fetch("https://script.google.com/macros/s/AKfycbyHkTe2menbP7DCS47HPNDaYjAO0wApCbPqraHaiwaRMLGPG-AO0tevm7UXIiTyjbbtqg/exec?type=C&name=" + encodeURIComponent(name))
+      fetch("https://script.google.com/macros/s/AKfycbyjb1CUs-wS-muegVpyRUKicgFsrD4_gRC9Lx4CL8F4v0bIhL8P154V5Tfu_j4qILe4iw/exec?type=C&name=" + encodeURIComponent(name))
         .then(res => res.json())
         .then(data => {
           document.getElementById("out_name").textContent = data.name;
