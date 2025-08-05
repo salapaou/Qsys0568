@@ -1,0 +1,105 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>รับคิว - นักเรียนทั่วไป</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      background: #fefae0;
+      font-family: 'Kanit', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    h1 {
+      color: #bc6c25;
+    }
+    input[type="text"] {
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      width: 280px;
+    }
+    button {
+      padding: 12px 30px;
+      font-size: 18px;
+      background-color: #bc6c25;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .card {
+      margin-top: 30px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      display: none;
+    }
+    .queue-number {
+      font-size: 48px;
+      font-weight: bold;
+      color: #bc6c25;
+    }
+  </style>
+</head>
+<body>
+  <img src="https://cdn-icons-png.flaticon.com/512/1995/1995476.png" alt="Logo" style="width:100px; margin-bottom: 20px;">
+  <h1>รับคิว - นักเรียนทั่วไป</h1>
+  <p>กรุณากรอกชื่อผู้ปกครองเพื่อรับหมายเลขคิว</p>
+  <input type="text" id="name" placeholder="ชื่อผู้ปกครอง"><br><br>
+  <button onclick="getQueue()">📥 รับคิว</button>
+
+  <div id="card" class="card">
+    <p>ชื่อผู้ปกครอง: <strong id="out_name"></strong></p>
+    <p>ประเภทคิว: <strong>A - นักเรียนทั่วไป</strong></p>
+    <p>หมายเลขคิวของคุณ:</p>
+    <div class="queue-number" id="queue_number"></div>
+    <p>วันที่: <span id="queue_date"></span></p>
+    <img id="qrImage" src="" alt="QR Code">
+    <br><br>
+    <button onclick="downloadCard()">📷 บันทึกภาพบัตรคิว</button>
+  </div>
+
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <script>
+    function getQueue() {
+      const name = document.getElementById("name").value.trim();
+      if (!name) {
+        alert("กรุณากรอกชื่อ");
+        return;
+      }
+
+      fetch("https://script.google.com/macros/s/AKfycbyHkTe2menbP7DCS47HPNDaYjAO0wApCbPqraHaiwaRMLGPG-AO0tevm7UXIiTyjbbtqg/exec?type=A&name=" + encodeURIComponent(name))
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("out_name").textContent = data.name;
+          document.getElementById("queue_number").textContent = data.queue;
+          document.getElementById("qrImage").src = data.qr;
+          document.getElementById("queue_date").textContent = new Date().toLocaleString('th-TH');
+          document.getElementById("card").style.display = "block";
+        })
+        .catch(err => {
+          alert("เกิดข้อผิดพลาดในการรับคิว");
+        });
+    }
+
+    function downloadCard() {
+      html2canvas(document.getElementById('card')).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'queue_card.png';
+        link.href = canvas.toDataURL();
+        link.click();
+      });
+    }
+  </script>
+</body>
+</html>
