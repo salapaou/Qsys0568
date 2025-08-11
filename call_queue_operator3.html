@@ -1,195 +1,140 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบเรียกคิวรวม</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 0.5rem;
-      background: #f5f5f5;
-    }
-    h1 {
-      text-align: center;
-      font-size: 1.5rem;
-      margin: 0.5rem 0;
-      color: #000;
-    }
-    .container {
-      display: flex;
-      flex-direction: row;
-      justify-content: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-    .column {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      flex: 1 1 300px;
-    }
-    .table-box {
-      border-radius: 10px;
-      padding: 0.4rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      min-height: 130px;
-      position: relative;
-      font-size: 0.8rem;
-    }
-    .table-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: bold;
-      font-size: 1rem;
-    }
-    .table-label {
-      background-color: #d32f2f;
-      color: white;
-      padding: 0.2rem 0.6rem;
-      border-radius: 6px;
-      font-size: 1rem;
-    }
-    .type-label {
-      background-color: #1976d2;
-      color: white;
-      padding: 0.2rem 0.6rem;
-      border-radius: 6px;
-      font-size: 1rem;
-    }
-    .queue-label {
-      font-size: 1.2rem;
-      color: #000;
-      text-align: center;
-      margin: 0.5rem 0;
-    }
-    .buttons {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 0.5rem;
-      margin-top: auto;
-    }
-    .btn-back {
-      width: 3rem;
-      height: 3rem;
-      font-size: 1rem;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      background: #f44336;
-      color: white;
-    }
-    .btn-repeat {
-      width: 6rem;
-      height: 3rem;
-      font-size: 1rem;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      background: #87ceeb;
-      color: white;
-    }
-    .btn-next {
-      width: 6rem;
-      height: 6rem;
-      font-size: 1.3rem;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      background: #4caf50;
-      color: white;
-    }
-    .type-a { background: #ffe5e5; }
-    .type-b { background: #e0f0ff; }
-    .type-c { background: #e8f5e9; }
-    .type-d { background: #fff3e0; }
-    .type-e { background: #f3e5f5; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ระบบเรียกคิวรวม</title>
+<style>
+  body{font-family:sans-serif;margin:0;background:#f5f5f5}
+  h1{margin:.5rem 0;text-align:center}
+  .container{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;padding:.5rem}
+  .column{flex:1 1 320px;display:flex;flex-direction:column;gap:.5rem;min-width:320px;max-width:560px}
+  .table-box{border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:.5rem;min-height:130px;display:flex;flex-direction:column}
+  .table-header{display:flex;justify-content:space-between;align-items:center;font-weight:700}
+  .table-label{background:#d32f2f;color:#fff;padding:.2rem .6rem;border-radius:6px}
+  .type-label{background:#1976d2;color:#fff;padding:.2rem .6rem;border-radius:6px}
+  .queue-label{font-size:1.3rem;margin:.4rem 0;text-align:center}
+  .buttons{margin-top:auto;display:flex;gap:.5rem;justify-content:flex-end;align-items:center}
+  .btn-back,.btn-repeat,.btn-next{border:none;border-radius:6px;color:#fff;cursor:pointer}
+  .btn-back{width:3rem;height:3rem;background:#f44336}
+  .btn-repeat{width:6rem;height:3rem;background:#87ceeb}
+  .btn-next{width:6rem;height:6rem;background:#4caf50;font-size:1.2rem}
+  .type-a{background:#ffe5e5}.type-b{background:#e0f0ff}.type-c{background:#e8f5e9}
+  .type-d{background:#fff3e0}.type-e{background:#f3e5f5}
+
+  /* แผงแจ้งข้อผิดพลาด */
+  #status{position:fixed;left:0;right:0;bottom:0;background:#222;color:#fff;
+    font-size:.9rem;padding:.4rem .6rem;display:none;z-index:9999}
+  #status.error{background:#b71c1c}
+</style>
 </head>
 <body>
   <h1>ระบบเรียกคิวรวม</h1>
   <div class="container" id="container"></div>
 
-  <audio id="sound-next" src="https://cdn.pixabay.com/audio/2022/03/15/audio_6e525c6022.mp3"></audio>
+  <!-- เสียงตอบสนอง -->
+  <audio id="sound-next"   src="https://cdn.pixabay.com/audio/2022/03/15/audio_6e525c6022.mp3"></audio>
   <audio id="sound-repeat" src="https://cdn.pixabay.com/audio/2022/03/15/audio_d16f0b0c55.mp3"></audio>
-  <audio id="sound-back" src="https://cdn.pixabay.com/audio/2022/03/15/audio_f4a56382a7.mp3"></audio>
+  <audio id="sound-back"   src="https://cdn.pixabay.com/audio/2022/03/15/audio_f4a56382a7.mp3"></audio>
 
-  <script>
-    const configUrl = "https://script.google.com/macros/s/AKfycbwuuZPNLWIyMp2VrfYTp1t6W0SPjR8YrJ9t0XebthlKydEE6TwoW2n8Hm9IMBNlNmQQtQ/exec?action=config";
+  <div id="status"></div>
 
-    const container = document.getElementById("container");
-    const soundNext = document.getElementById("sound-next");
-    const soundRepeat = document.getElementById("sound-repeat");
-    const soundBack = document.getElementById("sound-back");
+<script>
+  const configUrl =
+    "https://script.google.com/macros/s/AKfycbwuuZPNLWIyMp2VrfYTp1t6W0SPjR8YrJ9t0XebthlKydEE6TwoW2n8Hm9IMBNlNmQQtQ/exec?action=config";
 
-    fetch(configUrl)
-      .then(res => res.json())
-      .then(data => {
-        // แปลง object เป็น array เพื่อใช้ forEach ได้
-        const entries = Object.entries(data).map(([table, info]) => ({
-          table: table,
-          type: info.code,
-          typename: info.name
-        }));
+  const container   = document.getElementById("container");
+  const soundNext   = document.getElementById("sound-next");
+  const soundRepeat = document.getElementById("sound-repeat");
+  const soundBack   = document.getElementById("sound-back");
+  const statusBar   = document.getElementById("status");
 
-        const left = document.createElement("div");
-        const right = document.createElement("div");
-        left.className = "column";
-        right.className = "column";
+  function showStatus(msg, isError=false){
+    statusBar.textContent = msg;
+    statusBar.className = isError ? "error" : "";
+    statusBar.style.display = "block";
+  }
 
-        entries.forEach((conf, index) => {
-          const box = document.createElement("div");
-          box.className = `table-box type-${conf.type.toLowerCase()}`;
+  // ป้องกันหน้าเงียบ: แจ้งกำลังโหลด
+  showStatus("กำลังโหลดการตั้งค่าโต๊ะ...");
 
-          const header = document.createElement("div");
-          header.className = "table-header";
-          header.innerHTML = `<span class='table-label'>โต๊ะ ${conf.table}</span><span class='type-label'>(${conf.type} - ${conf.typename})</span>`;
+  fetch(configUrl, { cache: "no-store", credentials: "omit" })
+    .then(res => {
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(raw => {
+      // รองรับทั้ง object { "1":{code,name}, ... } และ array [{table,code/name}, ...]
+      let entries = Array.isArray(raw)
+        ? raw.map(x => ({
+            table: String(x.table ?? x.id ?? ""),
+            type:  (x.code ?? x.type ?? "").toString(),
+            typename: (x.name ?? x.typename ?? "").toString()
+          }))
+        : Object.entries(raw).map(([table, info]) => ({
+            table: String(table),
+            type:  (info.code ?? info.type ?? "").toString(),
+            typename: (info.name ?? info.typename ?? "").toString()
+          }));
 
-          const queue = document.createElement("div");
-          queue.className = "queue-label";
-          queue.id = `queue-${conf.table}`;
-          queue.innerText = `-`;
+      // จัดเรียงตามหมายเลขโต๊ะ (ตัวเลขจริง)
+      entries = entries.sort((a,b) => Number(a.table) - Number(b.table));
 
-          const btnBack = document.createElement("button");
-          btnBack.className = "btn-back";
-          btnBack.innerText = "⏪";
-          btnBack.onclick = () => soundBack.play();
+      // แบ่งซ้าย/ขวา 5:5 (หรือเท่าที่มี)
+      const left = document.createElement("div");
+      const right = document.createElement("div");
+      left.className = "column"; right.className = "column";
 
-          const btnRepeat = document.createElement("button");
-          btnRepeat.className = "btn-repeat";
-          btnRepeat.innerText = "🔁";
-          btnRepeat.onclick = () => soundRepeat.play();
+      entries.forEach((conf, idx) => {
+        const box = document.createElement("div");
+        box.className = `table-box type-${(conf.type || "x").toLowerCase()}`;
 
-          const btnNext = document.createElement("button");
-          btnNext.className = "btn-next";
-          btnNext.innerText = "CALL";
-          btnNext.onclick = () => soundNext.play();
+        // header
+        const header = document.createElement("div");
+        header.className = "table-header";
+        header.innerHTML =
+          `<span class="table-label">โต๊ะ ${conf.table}</span>` +
+          `<span class="type-label">(${conf.type} - ${conf.typename})</span>`;
 
-          const buttons = document.createElement("div");
-          buttons.className = "buttons";
-          buttons.appendChild(btnBack);
-          buttons.appendChild(btnRepeat);
-          buttons.appendChild(btnNext);
+        // queue label
+        const queue = document.createElement("div");
+        queue.className = "queue-label";
+        queue.id = `queue-${conf.table}`;
+        queue.textContent = "-";
 
-          box.appendChild(header);
-          box.appendChild(queue);
-          box.appendChild(buttons);
-
-          (index < 5 ? left : right).appendChild(box);
+        // buttons
+        const btnBack = Object.assign(document.createElement("button"), {
+          className: "btn-back",
+          textContent: "⏪",
+          onclick: () => soundBack.play()
+        });
+        const btnRepeat = Object.assign(document.createElement("button"), {
+          className: "btn-repeat",
+          textContent: "🔁",
+          onclick: () => soundRepeat.play()
+        });
+        const btnNext = Object.assign(document.createElement("button"), {
+          className: "btn-next",
+          textContent: "CALL",
+          onclick: () => soundNext.play()
         });
 
-        container.appendChild(left);
-        container.appendChild(right);
-      })
-      .catch(err => {
-        console.error("โหลด config ไม่ได้:", err);
+        const buttons = document.createElement("div");
+        buttons.className = "buttons";
+        buttons.append(btnBack, btnRepeat, btnNext);
+
+        box.append(header, queue, buttons);
+        (idx < Math.ceil(entries.length/2) ? left : right).appendChild(box);
       });
-  </script>
+
+      container.replaceChildren(left, right);
+      showStatus(`โหลดสำเร็จ: โต๊ะ ${entries.length} โต๊ะ`);
+      setTimeout(()=> statusBar.style.display="none", 1800);
+    })
+    .catch(err => {
+      console.error(err);
+      showStatus("โหลดการตั้งค่าไม่ได้: " + err.message + " (ตรวจสิทธิ์ Web App/Sheet และลอง Ctrl+F5)", true);
+    });
+</script>
 </body>
 </html>
