@@ -122,10 +122,26 @@
         btnBack.addEventListener("click", () => {
           highlightButton(btnBack);
           playSound(soundBack);
-          fetch(`${queueUrl}?action=back&type=${encodeURIComponent(conf.type)}&name=${encodeURIComponent(conf.typename)}`)
+
+          const qnum = queue.textContent.trim();
+          if (!qnum || qnum === "-") {
+            showStatus("ยังไม่มีคิว", true);
+            setTimeout(() => (statusBar.style.display = "none"), 1500);
+            return;
+          }
+
+          fetch(`${queueUrl}?action=back&type=${encodeURIComponent(conf.type)}&name=${encodeURIComponent(conf.typename)}&table=${encodeURIComponent(conf.table)}&queue=${encodeURIComponent(qnum)}`)
             .then(r => { if(!r.ok) throw new Error(r.status); return r.json(); })
-            .then(() => { showStatus("เรียกคิวแล้ว"); setTimeout(() => statusBar.style.display = "none", 1500); })
-            .catch(err => { console.error(err); showStatus("ล้มเหลว", true); setTimeout(() => statusBar.style.display = "none", 1500); });
+            .then(() => {
+              queue.textContent = "-";
+              showStatus("เรียกคิวแล้ว");
+              setTimeout(() => statusBar.style.display = "none", 1500);
+            })
+            .catch(err => {
+              console.error(err);
+              showStatus("ล้มเหลว", true);
+              setTimeout(() => statusBar.style.display = "none", 1500);
+            });
         });
 
         const btnRepeat = document.createElement("button");
@@ -134,10 +150,25 @@
         btnRepeat.addEventListener("click", () => {
           highlightButton(btnRepeat);
           playSound(soundRepeat);
-          fetch(`${queueUrl}?action=repeat&type=${encodeURIComponent(conf.type)}&name=${encodeURIComponent(conf.typename)}`)
+
+          const qnum = queue.textContent.trim();
+          if (!qnum || qnum === "-") {
+            showStatus("ยังไม่มีคิว", true);
+            setTimeout(() => (statusBar.style.display = "none"), 1500);
+            return;
+          }
+
+          fetch(`${queueUrl}?action=repeat&type=${encodeURIComponent(conf.type)}&name=${encodeURIComponent(conf.typename)}&table=${encodeURIComponent(conf.table)}&queue=${encodeURIComponent(qnum)}`)
             .then(r => { if(!r.ok) throw new Error(r.status); return r.json(); })
-            .then(() => { showStatus("เรียกคิวแล้ว"); setTimeout(() => statusBar.style.display = "none", 1500); })
-            .catch(err => { console.error(err); showStatus("ล้มเหลว", true); setTimeout(() => statusBar.style.display = "none", 1500); });
+            .then(() => {
+              showStatus("เรียกคิวแล้ว");
+              setTimeout(() => statusBar.style.display = "none", 1500);
+            })
+            .catch(err => {
+              console.error(err);
+              showStatus("ล้มเหลว", true);
+              setTimeout(() => statusBar.style.display = "none", 1500);
+            });
         });
 
         const btnNext = document.createElement("button");
@@ -146,10 +177,20 @@
         btnNext.addEventListener("click", () => {
           highlightButton(btnNext);
           playSound(soundNext);
-          fetch(`${queueUrl}?type=${encodeURIComponent(conf.type)}&name=${encodeURIComponent(conf.typename)}`)
+
+          fetch(`${queueUrl}?action=call&type=${encodeURIComponent(conf.type)}&name=${encodeURIComponent(conf.typename)}&table=${encodeURIComponent(conf.table)}`)
             .then(r => { if(!r.ok) throw new Error(r.status); return r.json(); })
-            .then(() => { showStatus("เรียกคิวแล้ว"); setTimeout(() => statusBar.style.display = "none", 1500); })
-            .catch(err => { console.error(err); showStatus("ล้มเหลว", true); setTimeout(() => statusBar.style.display = "none", 1500); });
+            .then(data => {
+              const qnum = data.queue || data.queue_number || data.queueNumber || "-";
+              queue.textContent = qnum;
+              showStatus("เรียกคิวแล้ว");
+              setTimeout(() => statusBar.style.display = "none", 1500);
+            })
+            .catch(err => {
+              console.error(err);
+              showStatus("ล้มเหลว", true);
+              setTimeout(() => statusBar.style.display = "none", 1500);
+            });
         });
 
         const buttons = document.createElement("div");
