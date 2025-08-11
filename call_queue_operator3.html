@@ -32,19 +32,18 @@
   <audio id="sound-back"   src="https://cdn.pixabay.com/audio/2022/03/15/audio_f4a56382a7.mp3"></audio>
 
 <script>
-/** URLs **/
 const configUrl = "https://script.google.com/macros/s/AKfycbwuuZPNLWIyMp2VrfYTp1t6W0SPjR8YrJ9t0XebthlKydEE6TwoW2n8Hm9IMBNlNmQQtQ/exec?action=config";
-const queueApi  = "https://script.google.com/macros/s/AKfycbyjb1CUs-wS-muegVpyRUKicgFsrD4_gRC9Lx4CL8F4v0bIhL8P154V5Tfu_j4qILe4iw/exec"; // รหัส.gs
+const queueApi  = "https://script.google.com/macros/s/AKfycbyjb1CUs-wS-muegVpyRUKicgFsrD4_gRC9Lx4CL8F4v0bIhL8P154V5Tfu_j4qILe4iw/exec";
 
-const container   = document.getElementById("container");
-const statusBar   = document.getElementById("status");
+const container = document.getElementById("container");
+const statusBar = document.getElementById("status");
 const soundNext   = document.getElementById("sound-next");
 const soundRepeat = document.getElementById("sound-repeat");
 const soundBack   = document.getElementById("sound-back");
 
-function showStatus(msg, mode){ // mode: ok|warn|err
+function showStatus(msg, mode){ // ok|warn|err
   statusBar.textContent = msg;
-  statusBar.className = mode ? mode : "";
+  statusBar.className = mode || "";
   statusBar.style.display = "block";
   clearTimeout(showStatus._t);
   showStatus._t = setTimeout(()=> statusBar.style.display="none", 1600);
@@ -52,16 +51,27 @@ function showStatus(msg, mode){ // mode: ok|warn|err
 function playSound(a){ a.currentTime=0; a.play().catch(()=>{}); }
 function flash(btn){ btn.style.opacity="0.6"; setTimeout(()=>btn.style.opacity="1",180); }
 
-/** โหลด config และวาดโต๊ะ */
+// โหลดสถานะคิวปัจจุบัน (called) ของทุกโต๊ะ แล้วไปแปะที่ label
+async function refreshStatus() {
+  try {
+    const res = await fetch(`${queueApi}?action=status`, {cache:"no-store", credentials:"omit"});
+    const map = await res.json(); // { "1": {queue:"A012", type:"A"}, ... }
+    Object.keys(map).forEach(table=>{
+      const q = document.getElementById(`queue-${table}`);
+      if (q) q.textContent = map[table].queue || "-";
+    });
+  } catch(_) {}
+}
+
 fetch(configUrl, {cache:"no-store", credentials:"omit"})
-  .then(r => { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+  .then(r => r.json())
   .then(raw => {
     let entries = Array.isArray(raw)
       ? raw.map(x => ({ table:String(x.table), code:String(x.code||x.type), name:String(x.name||x.typename) }))
       : Object.entries(raw).map(([table,info]) => ({ table:String(table), code:String(info.code), name:String(info.name) }));
-
     entries.sort((a,b)=> Number(a.table)-Number(b.table));
 
+    // สร้าง UI
     entries.forEach(conf => {
       const box = document.createElement("div");
       box.className = "table-box";
@@ -83,55 +93,53 @@ fetch(configUrl, {cache:"no-store", credentials:"omit"})
       const btnRepeat = document.getElementById(`btn-repeat-${conf.table}`);
       const btnNext   = document.getElementById(`btn-next-${conf.table}`);
 
-      // CALL → เรียกคิวถัดไปจาก waiting (ไม่ใช่เพิ่มคิวใหม่)
+      // CALL → action=next&table=#
       btnNext.onclick = async () => {
         flash(btnNext); playSound(soundNext);
         try{
           const url = `${queueApi}?action=next&table=${encodeURIComponent(conf.table)}`;
-          const res = await fetch(url, {cache:"no-store", credentials:"omit"});
-          const out = await res.json().catch(()=> ({}));
+          const out = await (await fetch(url, {cache:"no-store", credentials:"omit"})).json();
           if(out.ok && out.queue){
-            qlbl.textContent = out.queue; // เช่น "A012"
+            qlbl.textContent = out.queue;
             showStatus(`โต๊ะ ${conf.table}: เรียกคิว ${out.queue}`, "ok");
+            refreshStatus(); // อัปเดตให้ตรงทุกตัว
           }else if(out.empty){
             showStatus(`โต๊ะ ${conf.table}: ไม่มีคิวรอ (${out.type||"-"})`, "warn");
           }else{
             showStatus(`โต๊ะ ${conf.table}: เรียกคิวไม่สำเร็จ`, "err");
           }
-        }catch(e){
-          showStatus(`โต๊ะ ${conf.table}: CALL ผิดพลาด`, "err");
-        }
+        }catch(e){ showStatus(`โต๊ะ ${conf.table}: CALL ผิดพลาด`, "err"); }
       };
 
-      // REPEAT → แค่เสียง/แจ้งเตือน
+      // REPEAT → แค่เสียง+แจ้งเตือน
       btnRepeat.onclick = () => {
         flash(btnRepeat); playSound(soundRepeat);
         showStatus(`โต๊ะ ${conf.table}: เรียกซ้ำ`, "warn");
       };
 
-      // BACK → ถอยคิวล่าสุดของโต๊ะนี้: called -> waiting
+      // BACK → action=back&table=#
       btnBack.onclick = async () => {
         flash(btnBack); playSound(soundBack);
         try{
           const url = `${queueApi}?action=back&table=${encodeURIComponent(conf.table)}`;
-          const res = await fetch(url, {cache:"no-store", credentials:"omit"});
-          const out = await res.json().catch(()=> ({}));
+          const out = await (await fetch(url, {cache:"no-store", credentials:"omit"})).json();
           if(out.ok){
-            qlbl.textContent = out.queue || "-"; // เช่นกลับมาเหลือ A011
+            qlbl.textContent = out.queue || "-";
             showStatus(`โต๊ะ ${conf.table}: ถอยสำเร็จ → ${out.queue||"-"}`, "warn");
+            refreshStatus();
           }else{
             showStatus(`โต๊ะ ${conf.table}: ถอยไม่สำเร็จ`, "err");
           }
-        }catch(e){
-          showStatus(`โต๊ะ ${conf.table}: BACK ผิดพลาด`, "err");
-        }
+        }catch(e){ showStatus(`โต๊ะ ${conf.table}: BACK ผิดพลาด`, "err"); }
       };
     });
 
-    showStatus(`โหลดโต๊ะสำเร็จ: ${entries.length} โต๊ะ`, "ok");
+    // ดึงคิวปัจจุบันมาแสดงตั้งแต่เปิดหน้า
+    refreshStatus();
+    // (ถ้าต้องการซิงก์ทุกเครื่องให้ใกล้ realtime เพิ่มบรรทัดนี้)
+    // setInterval(refreshStatus, 3000);
   })
   .catch(err => {
-    console.error(err);
     showStatus("โหลดการตั้งค่าไม่ได้ (ตรวจสิทธิ์ Web App/Sheet แล้วรีเฟรช)", "err");
   });
 </script>
