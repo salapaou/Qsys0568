@@ -6,76 +6,81 @@
 <title>ระบบเรียกคิวรวม</title>
 <style>
   body{font-family:sans-serif;margin:0;background:#f5f5f5}
-  h1{margin:.5rem 0;text-align:center}
-  .container{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;padding:.5rem}
-  .column{flex:1 1 320px;display:flex;flex-direction:column;gap:.5rem;min-width:320px;max-width:560px}
-  .table-box{border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:.5rem;min-height:130px;display:flex;flex-direction:column}
-  .table-header{display:flex;justify-content:space-between;align-items:center;font-weight:700}
-  .table-label{background:#d32f2f;color:#fff;padding:.2rem .6rem;border-radius:6px}
-  .type-label{background:#1976d2;color:#fff;padding:.2rem .6rem;border-radius:6px}
-  .queue-label{font-size:1.3rem;margin:.4rem 0;text-align:center}
+  h1{margin:.5rem 0;text-align:center;font-size:1.2rem}
+  .container{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;padding:.5rem}
+  .table-box{border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:.5rem;min-width:220px;display:flex;flex-direction:column;background:#fff}
+  .table-header{display:flex;justify-content:space-between;font-weight:700}
+  .queue-label{font-size:1.4rem;font-weight:700;text-align:center;margin:.4rem 0}
   .buttons{margin-top:auto;display:flex;gap:.5rem;justify-content:flex-end;align-items:center}
-  .btn-back,.btn-repeat,.btn-next{border:none;border-radius:6px;color:#fff;cursor:pointer}
+  .btn{border:none;border-radius:6px;color:#fff;cursor:pointer;transition:opacity .15s}
+  .btn:active{opacity:.7}
   .btn-back{width:3rem;height:3rem;background:#f44336}
-  .btn-repeat{width:6rem;height:3rem;background:#87ceeb}
-  .btn-next{width:6rem;height:6rem;background:#4caf50;font-size:1.2rem}
+  .btn-repeat{width:5.5rem;height:3rem;background:#2196f3}
+  .btn-next{width:6rem;height:6rem;background:#4caf50;font-size:1.15rem}
+  /* พื้นหลังตาม type (ถ้ามีในอนาคตอยากแยกสี) */
   .type-a{background:#ffe5e5}.type-b{background:#e0f0ff}.type-c{background:#e8f5e9}
   .type-d{background:#fff3e0}.type-e{background:#f3e5f5}
 
-  /* แผงแจ้งข้อผิดพลาด */
+  /* แถบสถานะล่างจอ */
   #status{position:fixed;left:0;right:0;bottom:0;background:#222;color:#fff;
-    font-size:.9rem;padding:.4rem .6rem;display:none;z-index:9999}
-  #status.error{background:#b71c1c}
+    padding:.4rem .6rem;font-size:.9rem;display:none;z-index:9999}
+  #status.ok{background:#2e7d32}
+  #status.warn{background:#ef6c00}
+  #status.err{background:#b71c1c}
 </style>
 </head>
 <body>
   <h1>ระบบเรียกคิวรวม</h1>
   <div class="container" id="container"></div>
+  <div id="status"></div>
 
   <!-- เสียงตอบสนอง -->
   <audio id="sound-next"   src="https://cdn.pixabay.com/audio/2022/03/15/audio_6e525c6022.mp3"></audio>
   <audio id="sound-repeat" src="https://cdn.pixabay.com/audio/2022/03/15/audio_d16f0b0c55.mp3"></audio>
   <audio id="sound-back"   src="https://cdn.pixabay.com/audio/2022/03/15/audio_f4a56382a7.mp3"></audio>
 
-  <div id="status"></div>
-
 <script>
-const configUrl = "https://script.google.com/macros/s/AKfycbwuuZPNLWIyMp2VrfYTp1t6W0SPjR8YrJ9t0XebthlKydEE6TwoW2n8Hm9IMBNlNmQQtQ/exec?action=config";
-// เรียกคิวจริง (ของเดิมที่คุณให้มา – ใช้กับ CALL)
-const callUrl   = "https://script.google.com/macros/s/AKfycbyjb1CUs-wS-muegVpyRUKicgFsrD4_gRC9Lx4CL8F4v0bIhL8P154V5Tfu_j4qILe4iw/exec";
-// ย้อนคิว: จะเรียกแบบ ?action=back&table=#
-const queueApi  = "https://script.google.com/macros/s/AKfycbyjb1CUs-wS-muegVpyRUKicgFsrD4_gRC9Lx4CL8F4v0bIhL8P154V5Tfu_j4qILe4iw/exec";
+/** 1) URL ของ API ทั้งสองฝั่ง **/
+const configUrl = "https://script.google.com/macros/s/AKfycbwuuZPNLWIyMp2VrfYTp1t6W0SPjR8YrJ9t0XebthlKydEE6TwoW2n8Hm9IMBNlNmQQtQ/exec?action=config"; // โหลดโต๊ะ+ประเภท
+const queueApi  = "https://script.google.com/macros/s/AKfycbyjb1CUs-wS-muegVpyRUKicgFsrD4_gRC9Lx4CL8F4v0bIhL8P154V5Tfu_j4qILe4iw/exec";              // CALL และ BACK (ไฟล์รหัส.gs)
 
-const container = document.getElementById("container");
-const statusDiv = document.getElementById("status");
-
+const container   = document.getElementById("container");
+const statusBar   = document.getElementById("status");
 const soundNext   = document.getElementById("sound-next");
 const soundRepeat = document.getElementById("sound-repeat");
 const soundBack   = document.getElementById("sound-back");
 
-function showStatus(msg, color="red") {
-  statusDiv.style.color = color;
-  statusDiv.innerText = msg;
-  setTimeout(() => { statusDiv.innerText = ""; }, 2000);
+function showStatus(msg, mode="ok"){ // mode: ok | warn | err
+  statusBar.textContent = msg;
+  statusBar.className = mode;
+  statusBar.style.display = "block";
+  clearTimeout(showStatus._t);
+  showStatus._t = setTimeout(()=> statusBar.style.display="none", 1600);
 }
-function playSound(aud){ aud.currentTime = 0; aud.play().catch(()=>{}); }
+function playSound(a){ a.currentTime=0; a.play().catch(()=>{}); }
 function flash(btn){ btn.style.opacity="0.6"; setTimeout(()=>btn.style.opacity="1",180); }
 
-fetch(configUrl)
-  .then(res => res.json())
+/** 2) โหลด config แล้ววาดกล่องโต๊ะจากข้อมูลจริง */
+fetch(configUrl, {cache:"no-store", credentials:"omit"})
+  .then(r => { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
   .then(raw => {
-    // รองรับทั้ง object {"1":{code,name},...} และ array
-    const entries = (Array.isArray(raw) ? raw.map(x=>({
-      table:String(x.table), code:String(x.code||x.type), name:String(x.name||x.typename)
-    })) : Object.entries(raw).map(([table,info])=>({
-      table:String(table), code:String(info.code), name:String(info.name)
-    }))).sort((a,b)=>Number(a.table)-Number(b.table));
+    // รองรับทั้ง object {"1":{code,name},...} และ array [{table,code/name},...]
+    let entries = Array.isArray(raw)
+      ? raw.map(x => ({ table:String(x.table), code:String(x.code||x.type), name:String(x.name||x.typename) }))
+      : Object.entries(raw).map(([table,info]) => ({ table:String(table), code:String(info.code), name:String(info.name) }));
 
+    // เรียงตามเลขโต๊ะ
+    entries.sort((a,b)=> Number(a.table)-Number(b.table));
+
+    // วาด UI
     entries.forEach(conf => {
       const box = document.createElement("div");
-      box.className = "table-box";
+      box.className = "table-box"; // จะเพิ่ม class type-a/b ได้ถ้าคุณต้องการ map สีตาม code
       box.innerHTML = `
-        <div class="table-header"><span>โต๊ะ ${conf.table} (${conf.code} - ${conf.name})</span></div>
+        <div class="table-header">
+          <span>โต๊ะ ${conf.table}</span>
+          <span>(${conf.code} - ${conf.name})</span>
+        </div>
         <div class="queue-label" id="queue-${conf.table}">-</div>
         <div class="buttons">
           <button class="btn btn-back"   id="btn-back-${conf.table}">⏪</button>
@@ -84,58 +89,58 @@ fetch(configUrl)
         </div>`;
       container.appendChild(box);
 
-      const qlbl = document.getElementById(`queue-${conf.table}`);
-      const bBack   = document.getElementById(`btn-back-${conf.table}`);
-      const bRepeat = document.getElementById(`btn-repeat-${conf.table}`);
-      const bNext   = document.getElementById(`btn-next-${conf.table}`);
+      const qlbl    = document.getElementById(`queue-${conf.table}`);
+      const btnBack   = document.getElementById(`btn-back-${conf.table}`);
+      const btnRepeat = document.getElementById(`btn-repeat-${conf.table}`);
+      const btnNext   = document.getElementById(`btn-next-${conf.table}`);
 
-      // CALL: เรียกคิวจริง (ตาม API add queue เดิมของคุณ)
-      bNext.onclick = async () => {
-        flash(bNext); playSound(soundNext);
-        try {
-          const url = `${callUrl}?type=${encodeURIComponent(conf.code)}&name=${encodeURIComponent(conf.name)}`;
-          const res = await fetch(url, { cache:"no-store", credentials:"omit" });
+      // CALL → เรียกคิวจริง: ใช้ queueApi แบบ doGet (พารามิเตอร์ type & name)
+      btnNext.onclick = async () => {
+        flash(btnNext); playSound(soundNext);
+        try{
+          const url = `${queueApi}?type=${encodeURIComponent(conf.code)}&name=${encodeURIComponent(conf.name)}`;
+          const res = await fetch(url, {cache:"no-store", credentials:"omit"});
           const out = await res.json().catch(()=> ({}));
-          if (out.queue) {
-            qlbl.textContent = out.queue;
-            showStatus(`โต๊ะ ${conf.table}: เรียกคิว ${out.queue}`, "green");
-          } else {
-            showStatus(`โต๊ะ ${conf.table}: เรียกคิวไม่สำเร็จ`, "red");
+          if(out.queue){
+            qlbl.textContent = out.queue;                 // สมมติฝั่ง GAS ส่ง queue กลับมา
+            showStatus(`โต๊ะ ${conf.table}: เรียกคิว ${out.queue}`, "ok");
+          }else{
+            showStatus(`โต๊ะ ${conf.table}: เรียกคิวไม่สำเร็จ`, "err");
           }
-        } catch(err){
-          showStatus(`โต๊ะ ${conf.table}: เกิดข้อผิดพลาด CALL`, "red");
+        }catch(e){
+          showStatus(`โต๊ะ ${conf.table}: เกิดข้อผิดพลาด CALL`, "err");
         }
       };
 
-      // REPEAT: แค่เสียง/feedback ให้ จนท.รู้ว่ากดติด
-      bRepeat.onclick = () => {
-        flash(bRepeat); playSound(soundRepeat);
-        showStatus(`โต๊ะ ${conf.table}: เรียกซ้ำ`, "blue");
-        // ไม่บันทึกอะไรตามที่คุณต้องการ
+      // REPEAT → แค่เสียง + แจ้งเตือน (ไม่บันทึก)
+      btnRepeat.onclick = () => {
+        flash(btnRepeat); playSound(soundRepeat);
+        showStatus(`โต๊ะ ${conf.table}: เรียกซ้ำ`, "warn");
       };
 
-      // BACK: เรียก API ให้ย้ายรายการล่าสุดของโต๊ะนี้จาก called -> waiting
-      bBack.onclick = async () => {
-        flash(bBack); playSound(soundBack);
-        try {
+      // BACK → ย้อนคิวล่าสุดของโต๊ะนี้จาก called → waiting
+      btnBack.onclick = async () => {
+        flash(btnBack); playSound(soundBack);
+        try{
           const url = `${queueApi}?action=back&table=${encodeURIComponent(conf.table)}`;
-          const res = await fetch(url, { cache:"no-store", credentials:"omit" });
+          const res = await fetch(url, {cache:"no-store", credentials:"omit"});
           const out = await res.json().catch(()=> ({}));
-          // ให้ฝั่ง GAS ส่งกลับ {ok:true, queue:"A011", type:"A"} หลังถอยสำเร็จ
-          if (out.ok) {
-            qlbl.textContent = out.queue || "-";
-            showStatus(`โต๊ะ ${conf.table}: ถอยสำเร็จ → คิวปัจจุบัน ${out.queue||"-"}`, "orange");
-          } else {
-            showStatus(`โต๊ะ ${conf.table}: ถอยไม่สำเร็จ`, "red");
+          if(out.ok){
+            qlbl.textContent = out.queue || "-";          // เช่น A011
+            showStatus(`โต๊ะ ${conf.table}: ถอยสำเร็จ → ${out.queue||"-"}`, "warn");
+          }else{
+            showStatus(`โต๊ะ ${conf.table}: ถอยไม่สำเร็จ`, "err");
           }
-        } catch(err){
-          showStatus(`โต๊ะ ${conf.table}: เกิดข้อผิดพลาด BACK`, "red");
+        }catch(e){
+          showStatus(`โต๊ะ ${conf.table}: เกิดข้อผิดพลาด BACK`, "err");
         }
       };
     });
+    showStatus(`โหลดโต๊ะสำเร็จ: ${entries.length} โต๊ะ`, "ok");
   })
   .catch(err => {
-    showStatus("โหลดการตั้งค่าไม่ได้", "red");
+    console.error(err);
+    showStatus("โหลดการตั้งค่าไม่ได้ (ตรวจสิทธิ์ Web App/Sheet แล้วรีเฟรช)", "err");
   });
 </script>
 </body>
