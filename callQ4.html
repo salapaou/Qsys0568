@@ -1,0 +1,173 @@
++<!DOCTYPE html>
++<html lang="th">
++<head>
++<meta charset="UTF-8" />
++<meta name="viewport" content="width=device-width, initial-scale=1.0" />
++<title>ระบบเรียกคิวรวม</title>
++<style>
++  body{font-family:sans-serif;margin:0;background:#f5f5f5}
++  h1{margin:.5rem 0;text-align:center}
++  .container{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;padding:.5rem}
++  .column{flex:1 1 320px;display:flex;flex-direction:column;gap:.5rem;min-width:320px;max-width:560px}
++  .table-box{border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);padding:.5rem;min-height:130px;display:flex;flex-direction:column}
++  .table-header{display:flex;justify-content:space-between;align-items:center;font-weight:700}
++  .table-label{background:#d32f2f;color:#fff;padding:.2rem .6rem;border-radius:6px}
++  .type-label{background:#1976d2;color:#fff;padding:.2rem .6rem;border-radius:6px}
++  .queue-label{font-size:1.3rem;margin:.4rem 0;text-align:center}
++  .buttons{margin-top:auto;display:flex;gap:.5rem;justify-content:flex-end;align-items:center}
++  .btn-back,.btn-repeat,.btn-next{border:none;border-radius:6px;color:#fff;cursor:pointer}
++  .btn-back{width:3rem;height:3rem;background:#f44336}
++  .btn-repeat{width:6rem;height:3rem;background:#87ceeb}
++  .btn-next{width:6rem;height:6rem;background:#4caf50;font-size:1.2rem}
++  .type-a{background:#ffe5e5}.type-b{background:#e0f0ff}.type-c{background:#e8f5e9}
++  .type-d{background:#fff3e0}.type-e{background:#f3e5f5}
++
++  /* แผงแจ้งข้อผิดพลาด */
++  #status{position:fixed;left:0;right:0;bottom:0;background:#222;color:#fff;
++    font-size:.9rem;padding:.4rem .6rem;display:none;z-index:9999}
++  #status.error{background:#b71c1c}
++</style>
++</head>
++<body>
++  <h1>ระบบเรียกคิวรวม</h1>
++  <div class="container" id="container"></div>
++
++  <!-- เสียงตอบสนอง -->
++  <audio id="sound-next"   src="https://cdn.pixabay.com/audio/2022/03/15/audio_6e525c6022.mp3"></audio>
++  <audio id="sound-repeat" src="https://cdn.pixabay.com/audio/2022/03/15/audio_d16f0b0c55.mp3"></audio>
++  <audio id="sound-back"   src="https://cdn.pixabay.com/audio/2022/03/15/audio_f4a56382a7.mp3"></audio>
++
++  <div id="status"></div>
++
++<script>
++  const configUrl =
++    "https://script.google.com/macros/s/AKfycbwuuZPNLWIyMp2VrfYTp1t6W0SPjR8YrJ9t0XebthlKydEE6TwoW2n8Hm9IMBNlNmQQtQ/exec?action=config";
++  const queueUrl = "https://script.google.com/macros/s/AKfycbyjb1CUs-wS-muegVpyRUKicgFsrD4_gRC9Lx4CL8F4v0bIhL8P154V5Tfu_j4qILe4iw/exec";
++
++  const container   = document.getElementById("container");
++  const soundNext   = document.getElementById("sound-next");
++  const soundRepeat = document.getElementById("sound-repeat");
++  const soundBack   = document.getElementById("sound-back");
++  const statusBar   = document.getElementById("status");
++
++  function playSound(audioElement) {
++    audioElement.currentTime = 0;
++    audioElement.play().catch(err => {
++      console.warn("ไม่สามารถเล่นเสียง:", err);
++    });
++  }
++
++  function highlightButton(btn) {
++    btn.style.opacity = "0.6";
++    setTimeout(() => btn.style.opacity = "1", 200);
++  }
++
++  function showStatus(msg, isError=false){
++    statusBar.textContent = msg;
++    statusBar.className = isError ? "error" : "";
++    statusBar.style.display = "block";
++  }
++
++  // ป้องกันหน้าเงียบ: แจ้งกำลังโหลด
++  showStatus("กำลังโหลดการตั้งค่าโต๊ะ...");
++
++  fetch(configUrl, { cache: "no-store", credentials: "omit" })
++    .then(res => {
++      if(!res.ok) throw new Error("HTTP " + res.status);
++      return res.json();
++    })
++    .then(raw => {
++      // รองรับทั้ง object { "1":{code,name}, ... } และ array [{table,code/name}, ...]
++      let entries = Array.isArray(raw)
++        ? raw.map(x => ({
++            table: String(x.table ?? x.id ?? ""),
++            type:  (x.code ?? x.type ?? "").toString(),
++            typename: (x.name ?? x.typename ?? "").toString()
++          }))
++        : Object.entries(raw).map(([table, info]) => ({
++            table: String(table),
++            type:  (info.code ?? info.type ?? "").toString(),
++            typename: (info.name ?? info.typename ?? "").toString()
++          }));
++
++      // จัดเรียงตามหมายเลขโต๊ะ (ตัวเลขจริง)
++      entries = entries.sort((a,b) => Number(a.table) - Number(b.table));
++
++      // แบ่งซ้าย/ขวา 5:5 (หรือเท่าที่มี)
++      const left = document.createElement("div");
++      const right = document.createElement("div");
++      left.className = "column"; right.className = "column";
++
++      entries.forEach((conf, idx) => {
++        const box = document.createElement("div");
++        box.className = `table-box type-${(conf.type || "x").toLowerCase()}`;
++
++        // header
++        const header = document.createElement("div");
++        header.className = "table-header";
++        header.innerHTML =
++          `<span class="table-label">โต๊ะ ${conf.table}</span>` +
++          `<span class="type-label">(${conf.type} - ${conf.typename})</span>`;
++
++        // queue label
++        const queue = document.createElement("div");
++        queue.className = "queue-label";
++        queue.id = `queue-${conf.table}`;
++        queue.textContent = "-";
++
++        // buttons
++        const btnBack = document.createElement("button");
++        btnBack.className = "btn-back";
++        btnBack.textContent = "⏪";
++        btnBack.addEventListener("click", () => {
++          highlightButton(btnBack);
++          playSound(soundBack);
++          fetch(`${queueUrl}?action=back&type=${encodeURIComponent(conf.type)}&name=${encodeURIComponent(conf.typename)}`)
++            .then(r => { if(!r.ok) throw new Error(r.status); return r.json(); })
++            .then(() => { showStatus("เรียกคิวแล้ว"); setTimeout(() => statusBar.style.display = "none", 1500); })
++            .catch(err => { console.error(err); showStatus("ล้มเหลว", true); setTimeout(() => statusBar.style.display = "none", 1500); });
++        });
++
++        const btnRepeat = document.createElement("button");
++        btnRepeat.className = "btn-repeat";
++        btnRepeat.textContent = "🔁";
++        btnRepeat.addEventListener("click", () => {
++          highlightButton(btnRepeat);
++          playSound(soundRepeat);
++          fetch(`${queueUrl}?action=repeat&type=${encodeURIComponent(conf.type)}&name=${encodeURIComponent(conf.typename)}`)
++            .then(r => { if(!r.ok) throw new Error(r.status); return r.json(); })
++            .then(() => { showStatus("เรียกคิวแล้ว"); setTimeout(() => statusBar.style.display = "none", 1500); })
++            .catch(err => { console.error(err); showStatus("ล้มเหลว", true); setTimeout(() => statusBar.style.display = "none", 1500); });
++        });
++
++        const btnNext = document.createElement("button");
++        btnNext.className = "btn-next";
++        btnNext.textContent = "CALL";
++        btnNext.addEventListener("click", () => {
++          highlightButton(btnNext);
++          playSound(soundNext);
++          fetch(`${queueUrl}?type=${encodeURIComponent(conf.type)}&name=${encodeURIComponent(conf.typename)}`)
++            .then(r => { if(!r.ok) throw new Error(r.status); return r.json(); })
++            .then(() => { showStatus("เรียกคิวแล้ว"); setTimeout(() => statusBar.style.display = "none", 1500); })
++            .catch(err => { console.error(err); showStatus("ล้มเหลว", true); setTimeout(() => statusBar.style.display = "none", 1500); });
++        });
++
++        const buttons = document.createElement("div");
++        buttons.className = "buttons";
++        buttons.append(btnBack, btnRepeat, btnNext);
++
++        box.append(header, queue, buttons);
++        (idx < Math.ceil(entries.length/2) ? left : right).appendChild(box);
++      });
++
++      container.replaceChildren(left, right);
++      showStatus(`โหลดสำเร็จ: โต๊ะ ${entries.length} โต๊ะ`);
++      setTimeout(()=> statusBar.style.display="none", 1800);
++    })
++    .catch(err => {
++      console.error(err);
++      showStatus("โหลดการตั้งค่าไม่ได้: " + err.message + " (ตรวจสิทธิ์ Web App/Sheet และลอง Ctrl+F5)", true);
++    });
++</script>
++</body>
++</html>
