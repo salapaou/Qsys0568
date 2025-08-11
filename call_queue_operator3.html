@@ -40,101 +40,103 @@
   <div id="status"></div>
 
 <script>
-  const configUrl =
-    "https://script.google.com/macros/s/AKfycbwuuZPNLWIyMp2VrfYTp1t6W0SPjR8YrJ9t0XebthlKydEE6TwoW2n8Hm9IMBNlNmQQtQ/exec?action=config";
+const configUrl = "https://script.google.com/macros/s/AKfycbwuuZPNLWIyMp2VrfYTp1t6W0SPjR8YrJ9t0XebthlKydEE6TwoW2n8Hm9IMBNlNmQQtQ/exec?action=config";
+// เรียกคิวจริง (ของเดิมที่คุณให้มา – ใช้กับ CALL)
+const callUrl   = "https://script.google.com/macros/s/AKfycbyjb1CUs-wS-muegVpyRUKicgFsrD4_gRC9Lx4CL8F4v0bIhL8P154V5Tfu_j4qILe4iw/exec";
+// ย้อนคิว: จะเรียกแบบ ?action=back&table=#
+const queueApi  = "https://script.google.com/macros/s/AKfycbyjb1CUs-wS-muegVpyRUKicgFsrD4_gRC9Lx4CL8F4v0bIhL8P154V5Tfu_j4qILe4iw/exec";
 
-  const container   = document.getElementById("container");
-  const soundNext   = document.getElementById("sound-next");
-  const soundRepeat = document.getElementById("sound-repeat");
-  const soundBack   = document.getElementById("sound-back");
-  const statusBar   = document.getElementById("status");
+const container = document.getElementById("container");
+const statusDiv = document.getElementById("status");
 
-  function showStatus(msg, isError=false){
-    statusBar.textContent = msg;
-    statusBar.className = isError ? "error" : "";
-    statusBar.style.display = "block";
-  }
+const soundNext   = document.getElementById("sound-next");
+const soundRepeat = document.getElementById("sound-repeat");
+const soundBack   = document.getElementById("sound-back");
 
-  // ป้องกันหน้าเงียบ: แจ้งกำลังโหลด
-  showStatus("กำลังโหลดการตั้งค่าโต๊ะ...");
+function showStatus(msg, color="red") {
+  statusDiv.style.color = color;
+  statusDiv.innerText = msg;
+  setTimeout(() => { statusDiv.innerText = ""; }, 2000);
+}
+function playSound(aud){ aud.currentTime = 0; aud.play().catch(()=>{}); }
+function flash(btn){ btn.style.opacity="0.6"; setTimeout(()=>btn.style.opacity="1",180); }
 
-  fetch(configUrl, { cache: "no-store", credentials: "omit" })
-    .then(res => {
-      if(!res.ok) throw new Error("HTTP " + res.status);
-      return res.json();
-    })
-    .then(raw => {
-      // รองรับทั้ง object { "1":{code,name}, ... } และ array [{table,code/name}, ...]
-      let entries = Array.isArray(raw)
-        ? raw.map(x => ({
-            table: String(x.table ?? x.id ?? ""),
-            type:  (x.code ?? x.type ?? "").toString(),
-            typename: (x.name ?? x.typename ?? "").toString()
-          }))
-        : Object.entries(raw).map(([table, info]) => ({
-            table: String(table),
-            type:  (info.code ?? info.type ?? "").toString(),
-            typename: (info.name ?? info.typename ?? "").toString()
-          }));
+fetch(configUrl)
+  .then(res => res.json())
+  .then(raw => {
+    // รองรับทั้ง object {"1":{code,name},...} และ array
+    const entries = (Array.isArray(raw) ? raw.map(x=>({
+      table:String(x.table), code:String(x.code||x.type), name:String(x.name||x.typename)
+    })) : Object.entries(raw).map(([table,info])=>({
+      table:String(table), code:String(info.code), name:String(info.name)
+    }))).sort((a,b)=>Number(a.table)-Number(b.table));
 
-      // จัดเรียงตามหมายเลขโต๊ะ (ตัวเลขจริง)
-      entries = entries.sort((a,b) => Number(a.table) - Number(b.table));
+    entries.forEach(conf => {
+      const box = document.createElement("div");
+      box.className = "table-box";
+      box.innerHTML = `
+        <div class="table-header"><span>โต๊ะ ${conf.table} (${conf.code} - ${conf.name})</span></div>
+        <div class="queue-label" id="queue-${conf.table}">-</div>
+        <div class="buttons">
+          <button class="btn btn-back"   id="btn-back-${conf.table}">⏪</button>
+          <button class="btn btn-repeat" id="btn-repeat-${conf.table}">🔁</button>
+          <button class="btn btn-next"   id="btn-next-${conf.table}">CALL</button>
+        </div>`;
+      container.appendChild(box);
 
-      // แบ่งซ้าย/ขวา 5:5 (หรือเท่าที่มี)
-      const left = document.createElement("div");
-      const right = document.createElement("div");
-      left.className = "column"; right.className = "column";
+      const qlbl = document.getElementById(`queue-${conf.table}`);
+      const bBack   = document.getElementById(`btn-back-${conf.table}`);
+      const bRepeat = document.getElementById(`btn-repeat-${conf.table}`);
+      const bNext   = document.getElementById(`btn-next-${conf.table}`);
 
-      entries.forEach((conf, idx) => {
-        const box = document.createElement("div");
-        box.className = `table-box type-${(conf.type || "x").toLowerCase()}`;
+      // CALL: เรียกคิวจริง (ตาม API add queue เดิมของคุณ)
+      bNext.onclick = async () => {
+        flash(bNext); playSound(soundNext);
+        try {
+          const url = `${callUrl}?type=${encodeURIComponent(conf.code)}&name=${encodeURIComponent(conf.name)}`;
+          const res = await fetch(url, { cache:"no-store", credentials:"omit" });
+          const out = await res.json().catch(()=> ({}));
+          if (out.queue) {
+            qlbl.textContent = out.queue;
+            showStatus(`โต๊ะ ${conf.table}: เรียกคิว ${out.queue}`, "green");
+          } else {
+            showStatus(`โต๊ะ ${conf.table}: เรียกคิวไม่สำเร็จ`, "red");
+          }
+        } catch(err){
+          showStatus(`โต๊ะ ${conf.table}: เกิดข้อผิดพลาด CALL`, "red");
+        }
+      };
 
-        // header
-        const header = document.createElement("div");
-        header.className = "table-header";
-        header.innerHTML =
-          `<span class="table-label">โต๊ะ ${conf.table}</span>` +
-          `<span class="type-label">(${conf.type} - ${conf.typename})</span>`;
+      // REPEAT: แค่เสียง/feedback ให้ จนท.รู้ว่ากดติด
+      bRepeat.onclick = () => {
+        flash(bRepeat); playSound(soundRepeat);
+        showStatus(`โต๊ะ ${conf.table}: เรียกซ้ำ`, "blue");
+        // ไม่บันทึกอะไรตามที่คุณต้องการ
+      };
 
-        // queue label
-        const queue = document.createElement("div");
-        queue.className = "queue-label";
-        queue.id = `queue-${conf.table}`;
-        queue.textContent = "-";
-
-        // buttons
-        const btnBack = Object.assign(document.createElement("button"), {
-          className: "btn-back",
-          textContent: "⏪",
-          onclick: () => soundBack.play()
-        });
-        const btnRepeat = Object.assign(document.createElement("button"), {
-          className: "btn-repeat",
-          textContent: "🔁",
-          onclick: () => soundRepeat.play()
-        });
-        const btnNext = Object.assign(document.createElement("button"), {
-          className: "btn-next",
-          textContent: "CALL",
-          onclick: () => soundNext.play()
-        });
-
-        const buttons = document.createElement("div");
-        buttons.className = "buttons";
-        buttons.append(btnBack, btnRepeat, btnNext);
-
-        box.append(header, queue, buttons);
-        (idx < Math.ceil(entries.length/2) ? left : right).appendChild(box);
-      });
-
-      container.replaceChildren(left, right);
-      showStatus(`โหลดสำเร็จ: โต๊ะ ${entries.length} โต๊ะ`);
-      setTimeout(()=> statusBar.style.display="none", 1800);
-    })
-    .catch(err => {
-      console.error(err);
-      showStatus("โหลดการตั้งค่าไม่ได้: " + err.message + " (ตรวจสิทธิ์ Web App/Sheet และลอง Ctrl+F5)", true);
+      // BACK: เรียก API ให้ย้ายรายการล่าสุดของโต๊ะนี้จาก called -> waiting
+      bBack.onclick = async () => {
+        flash(bBack); playSound(soundBack);
+        try {
+          const url = `${queueApi}?action=back&table=${encodeURIComponent(conf.table)}`;
+          const res = await fetch(url, { cache:"no-store", credentials:"omit" });
+          const out = await res.json().catch(()=> ({}));
+          // ให้ฝั่ง GAS ส่งกลับ {ok:true, queue:"A011", type:"A"} หลังถอยสำเร็จ
+          if (out.ok) {
+            qlbl.textContent = out.queue || "-";
+            showStatus(`โต๊ะ ${conf.table}: ถอยสำเร็จ → คิวปัจจุบัน ${out.queue||"-"}`, "orange");
+          } else {
+            showStatus(`โต๊ะ ${conf.table}: ถอยไม่สำเร็จ`, "red");
+          }
+        } catch(err){
+          showStatus(`โต๊ะ ${conf.table}: เกิดข้อผิดพลาด BACK`, "red");
+        }
+      };
     });
+  })
+  .catch(err => {
+    showStatus("โหลดการตั้งค่าไม่ได้", "red");
+  });
 </script>
 </body>
 </html>
